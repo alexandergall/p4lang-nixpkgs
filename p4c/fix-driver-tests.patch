@@ -1,0 +1,14 @@
+diff -Naur p4c-df9e3ee28ae9b1d9d370c7b8543a953a1c490bc3.orig/tools/driver/test_scripts/driver_inputs_test___shared_code.bash p4c-df9e3ee28ae9b1d9d370c7b8543a953a1c490bc3/tools/driver/test_scripts/driver_inputs_test___shared_code.bash
+--- p4c-df9e3ee28ae9b1d9d370c7b8543a953a1c490bc3.orig/tools/driver/test_scripts/driver_inputs_test___shared_code.bash	2024-11-27 22:26:12.000000000 +0100
++++ p4c-df9e3ee28ae9b1d9d370c7b8543a953a1c490bc3/tools/driver/test_scripts/driver_inputs_test___shared_code.bash	2024-11-28 13:26:05.478952616 +0100
+@@ -87,8 +87,8 @@
+ # Arguments: $1 - path to the binary file
+ validate_driver_binary() {
+     local binary_path="$1"
+-    check_file_exists "$binary_path"
+-    check_is_executable "$binary_path"
++    check_driver_binary_exists "$binary_path"
++    check_driver_is_executable "$binary_path"
+ }
+ 
+ 
