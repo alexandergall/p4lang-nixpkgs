@@ -80,10 +80,7 @@ in stdenv.mkDerivation rec {
     repo = "p4c";
     owner = "p4lang";
     rev = "v${version}";
-    hash = "sha256-0BZtPqUH4GMzQ8EnkzUkLnQQyryjdp0HVJ0tCR3AlXI=";
-    ## The version logic in CMakeLists.txt uses git rev-parse to add
-    ## the commit hash to P4C_VERSION
-    leaveDotGit = true;
+    hash = "sha256-npGtP7bxfSQrMhNObo9lhEgGGRE9HNnhWV6vihTw0Y8=";
   };
   passthru = {
     inherit src;
@@ -184,6 +181,14 @@ in stdenv.mkDerivation rec {
   enableParallelBuilding = true;
   inherit doCheck;
   preConfigure =
+    ### Set the version explicitely, otherwise CMake will atempt to
+    ### use git to determine the commit hash, which fails because our
+    ### source doesn't have .git (and using leaveDotGit in
+    ### fetchFromGitHub is not deterministic).
+    ''
+      export P4C_VERSION=${version}
+    ''+
+
     ### Protobuf is very picky about version number matches
     ''
       substituteInPlace cmake/Protobuf.cmake \
