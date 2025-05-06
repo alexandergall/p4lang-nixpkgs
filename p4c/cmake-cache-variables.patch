@@ -1,0 +1,44 @@
+diff --git a/cmake/FindBMV2.cmake b/cmake/FindBMV2.cmake
+index 13e7a344b..4f8427b81 100644
+--- a/cmake/FindBMV2.cmake
++++ b/cmake/FindBMV2.cmake
+@@ -1,7 +1,8 @@
+ # To find the BMv2 executables in the BMv2 source tree instead of
+ # an installed location, set BMV2_SOURCE_DIR to the BMv2 source directory.
+ set(BMV2_SIMPLE_SWITCH_SEARCH_PATHS
+-  ${CMAKE_INSTALL_PREFIX}/bin)
++  ${CMAKE_INSTALL_PREFIX}/bin
++  CACHE STRING "")
+ if(DEFINED BMV2_SOURCE_DIR)
+   set(BMV2_SIMPLE_SWITCH_SEARCH_PATHS
+     ${BMV2_SIMPLE_SWITCH_SEARCH_PATHS}
+@@ -26,7 +27,8 @@ find_package_handle_standard_args ("BMV2"
+   SIMPLE_SWITCH SIMPLE_SWITCH_CLI)
+ 
+ set(BMV2_SIMPLE_SWITCH_GRPC_SEARCH_PATHS
+-  ${CMAKE_INSTALL_PREFIX}/bin)
++  ${CMAKE_INSTALL_PREFIX}/bin
++  CACHE STRING "")
+ if(DEFINED BMV2_SOURCE_DIR)
+   set(BMV2_SIMPLE_SWITCH_GRPC_SEARCH_PATHS
+     ${BMV2_SIMPLE_SWITCH_GRPC_SEARCH_PATHS}
+@@ -46,7 +48,8 @@ find_package_handle_standard_args ("BMV2"
+ 
+ 
+ set(BMV2_PSA_SWITCH_SEARCH_PATHS
+-  ${CMAKE_INSTALL_PREFIX}/bin)
++  ${CMAKE_INSTALL_PREFIX}/bin
++  CACHE STRING "")
+ if(DEFINED BMV2_SOURCE_DIR)
+   set(BMV2_PSA_SWITCH_SEARCH_PATHS
+     ${BMV2_PSA_SWITCH_SEARCH_PATHS}
+@@ -71,7 +74,8 @@ find_package_handle_standard_args ("BMV2"
+   PSA_SWITCH PSA_SWITCH_CLI)
+ 
+ set(BMV2_PNA_NIC_SEARCH_PATHS
+-  ${CMAKE_INSTALL_PREFIX}/bin)
++  ${CMAKE_INSTALL_PREFIX}/bin
++  CACHE STRING "")
+ if(DEFINED BMV2_SOURCE_DIR)
+   set(BMV2_PNA_NIC_SEARCH_PATHS
+     ${BMV2_PNA_NIC_SEARCH_PATHS}
