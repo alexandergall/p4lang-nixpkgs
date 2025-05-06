@@ -10,7 +10,7 @@
 }:
 
 stdenv.mkDerivation {
-  pname = "p4lang-target-utils";
+  pname = "target-utils";
   version = "v1.0.0-12-g386e7e1";
   src = fetchFromGitHub {
     repo = "target-utils";

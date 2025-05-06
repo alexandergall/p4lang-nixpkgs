@@ -3,7 +3,7 @@
 }:
 
 python3.pkgs.buildPythonApplication rec {
-  pname = "p4lang-ptf";
+  pname = "ptf";
   ## Setuptools doesn't accept Git commits as valid version number
   version = "0.9.4-17";
   

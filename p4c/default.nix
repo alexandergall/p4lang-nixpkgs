@@ -1,9 +1,10 @@
 { lib
 , stdenv
 , fetchFromGitHub
+, vmTools
 , bmv2
 , ptf
-, PI-py
+, p4runtime-py
 , cmake
 , python3
 , flex
@@ -22,22 +23,32 @@
 , libbpf
 , gtest
 , libbacktrace
-, git
 
-  ## Some checks can only be run inside a VM, turn off by default
-,  doCheck ? false
+  ## Some checks can only be run inside a VM, turn off by
+  ## default. memSize is the memory assigned to the VM, change to
+  ## match your setup
+, doCheck ? false
+, memSize ? 20*1024
+
+  ## Run the lint checks before building p4c. The Build will fail if
+  ## any of the checks fail
+, lintChecks ? false
 
   ## Configure options
-,  enableTofino ? true
-,  enableBMV2 ? true
-,  enableBPF ? true
-,  enableDPDK ? true
-,  enableP4TC ? true
-,  enableP4FMT ? true
-,  enableP4CGraphs ? true
+, enableTofino ? true
+, enableBMV2 ? true
+, enableBPF ? true
+, enableDPDK ? true
+, enableP4TC ? true
+, enableP4FMT ? true
+, enableP4CGraphs ? true
   
   ## For ebpf test cases
 , elfutils
+
+  ## For lint checks
+, black
+, isort
 
   ## For various tests
 , iproute2
@@ -48,6 +59,7 @@
 , gmp
 }:
 
+assert lintChecks -> ! doCheck;
 let
   toCMakeBoolean = v: if v then "ON" else "OFF";
   googletest = fetchFromGitHub {
@@ -64,8 +76,6 @@ let
     rev = "ec4eb5ef70dbcbcbf2f8357a4b2b8c2f218845a5";
     sha256 = "03xycmagalns7xwldw45z44wpcylj1wvjv5fnnzskkfchdq5wg3y";
   };
-  ## The dev output of the standard spdlog is missing
-  ## include/spdlog/fmt/bundled
   spdlog = fetchFromGitHub {
     repo = "spdlog";
     owner = "gabime";
@@ -73,174 +83,204 @@ let
     rev = "v1.8.3";
     sha256 = "1qcabdc3yrm30vapn7g7lf3bwjissl15y66mpmx2w0gjjc6aqdd1";
   };
-in stdenv.mkDerivation rec {
-  name = "p4c";
-  version = "1.2.5.4";
-  src = fetchFromGitHub {
-    repo = "p4c";
-    owner = "p4lang";
-    rev = "v${version}";
-    hash = "sha256-npGtP7bxfSQrMhNObo9lhEgGGRE9HNnhWV6vihTw0Y8=";
+  inja = fetchFromGitHub {
+    repo = "inja";
+    owner = "pantor";
+    ## From backends/p4tools/modules/testgen/CMakeLists.txt
+    rev = "3741c73ba78babd2ed88f2acf2fcd6dafdb878e8";
+    hash = "sha256-QnAgKsqI/ix+ZVuKdOfrvpnm0odMvhWa8ja2Vs8oN/g=";
   };
-  passthru = {
-    inherit src;
-  };
-  patches = [
-    ## Some eBPF tests fail with stack protection enabled, which is
-    ## the default for our version of clang
-    ./disable-stack-protection.patch
+  p4c = stdenv.mkDerivation rec {
+    name = "p4c";
+    version = "1.2.5.6";
+    src = fetchFromGitHub {
+      repo = "p4c";
+      owner = "p4lang";
+      rev = "v${version}";
+      hash = "sha256-65wOacVvbdOlRhOsk8CjtQM+ugsPyNNBaJ9qslkw/i8=";
+    };
 
-    ## Allow overrides via cmakeFlags, see below
-    ./make-bmv2-path-overridable.patch
+    patches = [
+      ## Allow overriding variables via cmakeFlags, see below
+      ./cmake-cache-variables.patch
 
-    ## Fix shell function references
-    ./fix-driver-tests.patch
-  ];
-  
-  nativeBuildInputs =
-    [ cmake flex bison pkg-config rapidjson llvm clang clang-tools llvm
-      libbpf python3.pkgs.wrapPython git
-
-      (python3.withPackages (pkgs:
-        with pkgs; [ jsl jsonschema ] ++
-                   lib.optionals doCheck [ scapy ply nnpy PI-py ]))
-      
-      ## find_package() for Protobuf complains about not finding zlib,
-      ## but we probably don't really need this
-      zlib.static
-                  
-      ## Add the spdlog header files to NIX_CFLAGS_COMPILE directly
-      ## from the source archive
-      spdlog
-
-      ## Used to bundle p4c-build-logs into a standalone
-      ## executable
-      python3.pkgs.pyinstaller
+      ## Fix shell function references
+      ./fix-driver-tests.patch
     ];
-  buildInputs = [ boost z3 abseil-cpp protobuf boehmgc libbacktrace ];
-  nativeCheckInputs = [
-    ## For BMV2 tests
-    bmv2
-                  
-    ## For ebpf tests
-    elfutils
-                  
-    ## For various tests
-    libpcap gmp gtest
-    iproute2 procps iptables tcpdump ptf
-  ];
-  cmakeFlags = [
-    "-DENABLE_TOFINO=${toCMakeBoolean enableTofino}"
-    "-DENABLE_BMV2=${toCMakeBoolean enableBMV2}"
-    "-DENABLE_EBPF=${toCMakeBoolean enableBPF}"
-    "-DENABLE_UBPF=${toCMakeBoolean enableBPF}"
-    "-DENABLE_DPDK=${toCMakeBoolean enableDPDK}"
-    "-DENABLE_P4TC=${toCMakeBoolean enableP4TC}"
-    "-DENABLE_P4FMT=${toCMakeBoolean enableP4FMT}"
-    "-DENABLE_P4C_GRAPHS=${toCMakeBoolean enableP4CGraphs}"
 
-    ## Flags derived from doCheck
-    "-DENABLE_GTESTS=${toCMakeBoolean doCheck}"
-    "-DENABLE_P4TEST=${toCMakeBoolean doCheck}"
+    nativeBuildInputs =
+      [ cmake flex bison pkg-config rapidjson llvm clang clang-tools llvm
+        libbpf python3.pkgs.wrapPython
 
-    "-DP4C_USE_PREINSTALLED_ABSEIL=ON"
-    "-DP4C_USE_PREINSTALLED_PROTOBUF=ON"
-    "-DP4C_USE_PREINSTALLED_BDWGC=ON"
-    "-DUSE_PREINSTALLED_Z3=ON"
+        (python3.withPackages (pkgs:
+          with pkgs; [ jsl jsonschema pyyaml ] ++
+                     lib.optionals doCheck [ scapy ply nnpy p4runtime-py ]))
 
-    ### Override CMake's FetchContent mechanism to use a pre-declared
-    ### source repository. This will make FetchContent_MakeAvailable()
-    ### skip the download.
-    "-DFETCHCONTENT_SOURCE_DIR_P4RUNTIME=${p4runtime}"
+        ## find_package() for Protobuf complains about not finding zlib,
+        ## but we probably don't really need this
+        zlib.static
 
-    ## libbpf doesn't have a "USE_PREINSTALLED", but it uses
-    ## find_library() to check for a previously built library. By
-    ## supplying a random existing location here, find_library() will
-    ## actually find the library supplied by the libbpf package,
-    ## i.e. it acts as one would expect with a "USE_PREINSTALL" flag
-    "-DFETCHCONTENT_SOURCE_DIR_BPFREPO=."
+        ## Used to bundle p4c-build-logs into a standalone
+        ## executable
+        python3.pkgs.pyinstaller
+      ] ++ lib.optionals lintChecks [ black isort ];
+    buildInputs = [ boost z3 abseil-cpp protobuf boehmgc libbacktrace ];
+    nativeCheckInputs = [
+      ## For BMV2 tests
+      bmv2
 
-  ] ++ lib.optionals enableTofino [
-    ## This is only to please FetchContent, the spdlog header files
-    ## are integrated through buildInputs
-    "-DFETCHCONTENT_SOURCE_DIR_SPDLOG=."
-  ] ++ lib.optionals doCheck [
-    "-DFETCHCONTENT_SOURCE_DIR_GTEST=${googletest}"
-    
-    ### Override search paths for components of bmv2, used for BMV2
-    ### tests. FindBMV2.cmake initializes these paths to relative
-    ### paths that point to pre-built binaries outside the p4c source
-    ### directory. These overrdies turn that into proper build
-    ### dependencies. The variables have to be marked as cacheable for
-    ### this to work, see patches above.
-    "-DBMV2_SIMPLE_SWITCH_SEARCH_PATHS=${bmv2}/bin"
-    "-DBMV2_PSA_SWITCH_SEARCH_PATHS=${bmv2}/bin"
-    "-DBMV2_SIMPLE_SWITCH_GRPC_SEARCH_PATHS=${bmv2}/bin"
-    "-DBMV2_PNA_NIC_SEARCH_PATHS=${bmv2}/bin"
-  ];
-  enableParallelBuilding = true;
-  inherit doCheck;
-  preConfigure =
-    ### Set the version explicitely, otherwise CMake will atempt to
-    ### use git to determine the commit hash, which fails because our
-    ### source doesn't have .git (and using leaveDotGit in
-    ### fetchFromGitHub is not deterministic).
-    ''
-      export P4C_VERSION=${version}
-    ''+
+      ## For ebpf tests
+      elfutils
 
-    ### Protobuf is very picky about version number matches
-    ''
-      substituteInPlace cmake/Protobuf.cmake \
-        --replace-fail 25.3 25.3.0
-    '' +
+      ## For various tests
+      libpcap gmp gtest
+      iproute2 procps iptables tcpdump ptf
 
-    ### Link libbpf to the place where the non-overriden
-    ### FetchContent_MakeAvailable() would put it
-    ''
-      mkdir -p backends/ebpf/runtime/usr/lib64
-      ln -s ${libbpf}/lib/libbpf.a backends/ebpf/runtime/usr/lib64
+      ## For the lint checks
+      black isort
+    ];
 
-      patchShebangs backends tools/driver/test_scripts
-    '' +
+    cmakeFlags = [
+      "-DENABLE_TOFINO=${toCMakeBoolean enableTofino}"
+      "-DENABLE_BMV2=${toCMakeBoolean enableBMV2}"
+      "-DENABLE_EBPF=${toCMakeBoolean enableBPF}"
+      "-DENABLE_UBPF=${toCMakeBoolean enableBPF}"
+      "-DENABLE_DPDK=${toCMakeBoolean enableDPDK}"
+      "-DENABLE_P4TC=${toCMakeBoolean enableP4TC}"
+      "-DENABLE_P4FMT=${toCMakeBoolean enableP4FMT}"
+      "-DENABLE_P4C_GRAPHS=${toCMakeBoolean enableP4CGraphs}"
 
-    ### The Tofino backend requires an assembler (bfas), which is
-    ### currently provided by open-p4studio. The latter contains the
-    ### p4c repo as a submodule and builds its own instance of the
-    ### compiler together with bfas and bfas ends up in the same bin
-    ### directory as the compiler. At runtime, the Tofino p4c driver
-    ### searches for bfas in that directory. This is done by first
-    ### setting the environment variable P4C_BIN_DIR to the directory
-    ### where p4c is located and then using that variable when
-    ### searching for bfas. This somewhat convoluted procedure doesn't
-    ### work for us because we use the this pre-built compiler package
-    ### when building open-p4studio. To solve this problem, we modify
-    ### the Barefoot driver to look for bfas via a new environment
-    ### variable BFAS_BIN_PATH and have the open-p4studio environment
-    ### generate a wrapper around p4c such that the driver can find
-    ### bfas within the open-p4studio package (the "p4-compiler"
-    ### sub-package, to be precise).
-    lib.optionalString enableTofino ''
-      substituteInPlace backends/tofino/bf-p4c/driver/barefoot.py \
-        --replace-fail "['P4C_BIN_DIR'], 'bfas')" "['BFAS_BIN_DIR'], 'bfas')"
+      ## For backends/p4tools/CMakeLists.txt, also see comment on
+      ## P4C_VERSION below
+      "-DP4C_SEM_VERSION_STRING=${version}"
+
+      ## Flags derived from doCheck
+      "-DENABLE_GTESTS=${toCMakeBoolean doCheck}"
+      "-DENABLE_P4TEST=${toCMakeBoolean doCheck}"
+      "-DENABLE_TEST_TOOLS=${toCMakeBoolean doCheck}"
+
+      ## Enable pre-installed dependencies
+      "-DP4C_USE_PREINSTALLED_ABSEIL=ON"
+      "-DP4C_USE_PREINSTALLED_BDWGC=ON"
+      "-DUSE_PREINSTALLED_Z3=ON"
+      "-DP4C_USE_PREINSTALLED_PROTOBUF=ON"
+
+      ## The non-pre-installed branch of p4c_obtain_protobuf in
+      ## cmake/Protobuf.cmake has the comment
+      ##  Protobuf does not seem to set Protobuf_INCLUDE_DIRS correctly
+      ## and proceeds to set it explicitly. There is no corresponding
+      ## workaround in the pre-installed branch, so add it
+      ## here. find_package() should discover this automatically,
+      ## though.
+      "-DProtobuf_INCLUDE_DIRS=${protobuf}/include"
+
+      ### Override CMake's FetchContent mechanism to use pre-declared
+      ### source repositories. This will make
+      ### FetchContent_MakeAvailable() skip the download. Ideally,
+      ### those should also have an optional "USE_PREINSTALLED".
+      "-DFETCHCONTENT_SOURCE_DIR_P4RUNTIME=${p4runtime}"
+      "-DFETCHCONTENT_SOURCE_DIR_INJA=${inja}"
+
+      ## libbpf doesn't have a "USE_PREINSTALLED", but it uses
+      ## find_library() to check for a previously built library. By
+      ## supplying a random existing location here, find_library() will
+      ## actually find the library supplied by the libbpf package,
+      ## i.e. it acts as one would expect with a "USE_PREINSTALL" flag
+      "-DFETCHCONTENT_SOURCE_DIR_BPFREPO=."
+
+    ] ++ lib.optionals doCheck [
+      "-DFETCHCONTENT_SOURCE_DIR_GTEST=${googletest}"
+
+      ### Override search paths for components of bmv2, used for BMV2
+      ### tests. FindBMV2.cmake initializes these paths to relative
+      ### paths that point to pre-built binaries outside the p4c
+      ### source directory. These overrides turn that into proper
+      ### build dependencies but for it to work the variables have to
+      ### be marked as cacheable, see patches above.
+      "-DBMV2_SIMPLE_SWITCH_SEARCH_PATHS=${bmv2}/bin"
+      "-DBMV2_PSA_SWITCH_SEARCH_PATHS=${bmv2}/bin"
+      "-DBMV2_SIMPLE_SWITCH_GRPC_SEARCH_PATHS=${bmv2}/bin"
+      "-DBMV2_PNA_NIC_SEARCH_PATHS=${bmv2}/bin"
+    ];
+
+    enableParallelBuilding = true;
+    inherit doCheck;
+    hardeningDisable = lib.optionals doCheck [
+      ## The BPF clang target doesn't like these
+      "stackprotector"
+      "zerocallusedregs"
+    ];
+
+    preConfigure =
+      ### Set the version explicitly, otherwise CMake will atempt to use
+      ### git to determine the commit hash, which fails because our
+      ### source doesn't have .git (and using leaveDotGit in
+      ### fetchFromGitHub is not deterministic).
+      ''
+        export P4C_VERSION=${version}
+      '' +
+
+      ### Protobuf is very picky about version number matches
+      ''
+        substituteInPlace cmake/Protobuf.cmake \
+          --replace-fail 25.3 25.3.0
+      '' +
+
+      ### Pre-populate spdlog to avoid FetchContent
+      lib.optionalString enableTofino
+      ''
+        mkdir -p backends/tofino/third_party
+        ln -s ${spdlog} backends/tofino/third_party/spdlog
+      '' +
+
+      ### Link libbpf to the place where the non-overriden
+      ### FetchContent_MakeAvailable() would put it
+      ''
+        mkdir -p backends/ebpf/runtime/usr/lib64
+        ln -s ${libbpf}/lib/libbpf.a backends/ebpf/runtime/usr/lib64
+
+        patchShebangs backends tools
+      '';
+
+    ### The lint checks are not provisioned as regular CMake tests.
+    ### In the P4lang CI system, they are run explicitly by the GitHub
+    ### workflow job ci-lint.yaml. We run them explicitly here when
+    ### requested.
+    postConfigure = lib.optionalString lintChecks ''
+      echo "Running lint checks"
+      cmake --build . --target cpplint
+      cmake --build . --target clang-format
+      cmake --build . --target black
+      cmake --build . --target isort
     '';
 
-  ## Some checks use clang's cpp. The version we're using has
-  ## -Wnunused-command-line-argument enabled by default which produces
-  ## a huge amount of warnings due to all -L options passed in via
-  ## NIX_LDFLAGS.
-  preCheck = ''
-    patchShebangs p4c */testdata p4c
-    NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -Wno-unused-command-line-argument"
-  '';
+    preCheck =
+      ## Some checks use clang's cpp. The version we're using has
+      ## -Wnunused-command-line-argument enabled by default which produces
+      ## a huge amount of warnings due to all -L options passed in via
+      ## NIX_LDFLAGS.
+      ''
+        patchShebangs p4c */testdata testgen/*
+        NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -Wno-unused-command-line-argument"
+      '';
 
-  ## Aggregated dependencies for Python scripts in $out/bin
-  pythonpath =  python3.withPackages (pkgs: with pkgs; [ jsonschema jsl ]);
-  postInstall = ''
-    wrapPythonPrograms    
-  '' +
-  ## Used for building bf-asm in open-p4studio
-  lib.optionalString enableTofino ''
-    cp backends/tofino/bf-p4c/git_sha_version.h $out/share/p4c
-  '';
-}
+    ## Aggregated dependencies for Python scripts in $out/bin
+    pythonpath =  python3.withPackages (pkgs: with pkgs; [ jsonschema jsl ]);
+    postInstall = ''
+      wrapPythonPrograms
+    '' +
+
+    ## open-p4studio expects p4c to be called bf-p4c
+    lib.optionalString enableTofino
+    ''
+      ln -sr $out/bin/p4c $out/bin/bf-p4c
+    '';
+  };
+in
+if doCheck then
+  vmTools.runInLinuxVM
+    (p4c.overrideAttrs {
+      inherit memSize;
+    })
+else
+  p4c

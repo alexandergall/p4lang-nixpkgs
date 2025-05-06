@@ -4,7 +4,7 @@
 }:
 
 stdenv.mkDerivation {
-  pname = "p4lang-target-syslibs";
+  pname = "target-syslibs";
   version = "v1.0.0-7-g240969c";
   src = fetchFromGitHub {
     repo = "target-syslibs";

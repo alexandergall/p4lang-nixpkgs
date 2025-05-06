@@ -9,7 +9,7 @@
 }:
 
 stdenv.mkDerivation rec {
-  pname = "p4lang-PI";
+  pname = "PI";
   version = "v0.1.0-25-g17802cf";
   src = fetchFromGitHub {
     repo = "PI";
