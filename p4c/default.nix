@@ -211,6 +211,10 @@ let
     ];
 
     preConfigure =
+      ''
+        patchShebangs backends tools
+      '' +
+
       ### Set the version explicitly, otherwise CMake will atempt to use
       ### git to determine the commit hash, which fails because our
       ### source doesn't have .git (and using leaveDotGit in
@@ -243,13 +247,16 @@ let
         ln -s ${spdlog} backends/tofino/third_party/spdlog
       '' +
 
-      ### Link libbpf to the place where the non-overriden
-      ### FetchContent_MakeAvailable() would put it
+      ### Create symlinks to the libbpf package in the place expected
+      ### by the test environment. Disable the check for the libc
+      ### version to enable the ebpf kernel test (that check does not
+      ### work in the VM and we know that our libc is ok).
+      lib.optionalString (doCheck && enableBPF)
       ''
         mkdir -p backends/ebpf/runtime/usr/lib64
         ln -s ${libbpf}/lib/libbpf.a backends/ebpf/runtime/usr/lib64
 
-        patchShebangs backends tools
+        sed -i -e 's/check_minimum_linux_libc_version.*$/set (SUPPORTS_LIBC TRUE)/' backends/ebpf/CMakeLists.txt
       '';
 
     ### The lint checks are not provisioned as regular CMake tests.

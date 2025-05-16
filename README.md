@@ -178,7 +178,6 @@ work.
 The following test suites are currently **not** supported
 
    * P4TC
-   * eBPF Kernel
    * DPDK
    * Tofino tests requring `bf_switchd` and `tofino-model` (though no
      actual tests appear to exist at this time)
