@@ -46,6 +46,9 @@
   ## For ebpf test cases
 , elfutils
 
+  ## For p4tools testgen
+, inja
+
   ## For lint checks
 , black
 , isort
@@ -82,13 +85,6 @@ let
     ## From backends/tofino/cmake/spdlog.cmake
     rev = "v1.8.3";
     sha256 = "1qcabdc3yrm30vapn7g7lf3bwjissl15y66mpmx2w0gjjc6aqdd1";
-  };
-  inja = fetchFromGitHub {
-    repo = "inja";
-    owner = "pantor";
-    ## From backends/p4tools/modules/testgen/CMakeLists.txt
-    rev = "3741c73ba78babd2ed88f2acf2fcd6dafdb878e8";
-    hash = "sha256-QnAgKsqI/ix+ZVuKdOfrvpnm0odMvhWa8ja2Vs8oN/g=";
   };
   p4c = stdenv.mkDerivation rec {
     name = "p4c";
@@ -131,6 +127,9 @@ let
 
       ## For ebpf tests
       elfutils
+
+      ## For p4tools testgen
+      inja
 
       ## For various tests
       libpcap gmp gtest
@@ -224,6 +223,17 @@ let
       ''
         substituteInPlace cmake/Protobuf.cmake \
           --replace-fail 25.3 25.3.0
+      '' +
+
+      lib.optionalString doCheck
+      ## Disable fetching of inja completely. It is sufficient to
+      ## declare the standard inja package in nativeCheckInputs for
+      ## the header files to be found. Note that unless we remove the
+      ## "PUBLIC inja" declaration, CMake will generate a bogus -linja
+      ## option for the linker that will make it exit with a
+      ## file-not-found error.
+      ''
+        sed -i -e '/fetchcontent_makeavailable_but_exclude_install(inja)/d;/PUBLIC inja/d' backends/p4tools/modules/testgen/CMakeLists.txt
       '' +
 
       ### Pre-populate spdlog to avoid FetchContent
