@@ -1,0 +1,20 @@
+diff --git a/backends/p4tools/modules/testgen/targets/tofino/test/P4Tests.cmake b/backends/p4tools/modules/testgen/targets/tofino/test/P4Tests.cmake
+index e0ef43824..9b46d65e0 100644
+--- a/backends/p4tools/modules/testgen/targets/tofino/test/P4Tests.cmake
++++ b/backends/p4tools/modules/testgen/targets/tofino/test/P4Tests.cmake
+@@ -21,6 +21,7 @@ set(
+   BF_SWITCHD_SEARCH_PATHS
+   ${BFN_P4C_SOURCE_DIR}/../install/bin
+   ${CMAKE_INSTALL_PREFIX}/bin
++  CACHE STRING ""
+ )
+ 
+ 
+@@ -43,6 +44,7 @@ set(
+   HARLYN_MODEL_SEARCH_PATHS
+   ${BFN_P4C_SOURCE_DIR}/../install/bin
+   ${CMAKE_INSTALL_PREFIX}/bin
++  CACHE STRING ""
+ )
+ 
+ find_program(HARLYN_MODEL tofino-model PATHS ${HARLYN_MODEL_SEARCH_PATHS} NO_DEFAULT_PATH)

@@ -21,6 +21,7 @@
 , zlib
 , llvm
 , libbpf
+, bpftools
 , gtest
 , libbacktrace
 
@@ -93,14 +94,21 @@ let
     rev = "v1.8.3";
     sha256 = "1qcabdc3yrm30vapn7g7lf3bwjissl15y66mpmx2w0gjjc6aqdd1";
   };
+  bf-sde = (import (fetchFromGitHub {
+    repo = "bf-sde-nixpkgs";
+    owner = "alexandergall";
+    ## Branch open-p4studio
+    rev = "29bf2447d58a549680956110e36e2fe024d45c73";
+    hash = "sha256-kqYHN4VORH7Ha/Np45LiiSp8xil9upGuADjSjvJqkUI=";
+  }) {}).bf-sde.v9_13_4;
   p4c = stdenv.mkDerivation (rec {
     pname = "p4c";
-    version = "1.2.5.6";
+    version = "1.2.5.7";
     src = fetchFromGitHub {
       repo = "p4c";
       owner = "p4lang";
       rev = "v${version}";
-      hash = "sha256-65wOacVvbdOlRhOsk8CjtQM+ugsPyNNBaJ9qslkw/i8=";
+      hash = "sha256-LydlLgkTFez6duymym9RS3+gRgfo//yhDeJ0wmQ6Qps=";
     };
 
     patches = [
@@ -109,7 +117,9 @@ let
 
       ## Fix shell function references
       ./fix-driver-tests.patch
-    ];
+    ] ++ lib.optional enableTofino
+      ## Make search paths for bf_switchd and tofino-model overridable
+      ./sde-cmake.patch;
 
     nativeBuildInputs =
       [ cmake flex bison pkg-config rapidjson llvm clang clang-tools llvm
@@ -132,8 +142,11 @@ let
       ## For BMV2 tests
       bmv2
 
+      ## For p4tools testgen
+      inja
+
       ## For ebpf tests
-      elfutils
+      elfutils bpftools
 
       ## For p4tools testgen
       inja
@@ -186,29 +199,34 @@ let
       ### FetchContent_MakeAvailable() skip the download. Ideally,
       ### those should also have an optional "USE_PREINSTALLED".
       "-DFETCHCONTENT_SOURCE_DIR_P4RUNTIME=${p4runtime}"
-      "-DFETCHCONTENT_SOURCE_DIR_INJA=${inja}"
 
-      ## libbpf doesn't have a "USE_PREINSTALLED", but it uses
-      ## find_library() to check for a previously built library. By
-      ## supplying a random existing location here, find_library() will
-      ## actually find the library supplied by the libbpf package,
-      ## i.e. it acts as one would expect with a "USE_PREINSTALL" flag
+      ## We try to use the Nix packages for libbpf and bpftool instead
+      ## of having CMake build it from source. This requires two
+      ## steps. The first is to prevent CMake from downloading the
+      ## source tarball by setting SOURCE_DIR_BFREPO to an arbitrary
+      ## existing path. The second step is to create symlinks to the
+      ## libbpf/bpftool packages in the appropriate places, see
+      ## preConfigure
       "-DFETCHCONTENT_SOURCE_DIR_BPFREPO=."
-
-    ] ++ lib.optionals doCheck [
-      "-DFETCHCONTENT_SOURCE_DIR_GTEST=${googletest}"
-
-      ### Override search paths for components of bmv2, used for BMV2
-      ### tests. FindBMV2.cmake initializes these paths to relative
-      ### paths that point to pre-built binaries outside the p4c
-      ### source directory. These overrides turn that into proper
-      ### build dependencies but for it to work the variables have to
-      ### be marked as cacheable, see patches above.
-      "-DBMV2_SIMPLE_SWITCH_SEARCH_PATHS=${bmv2}/bin"
-      "-DBMV2_PSA_SWITCH_SEARCH_PATHS=${bmv2}/bin"
-      "-DBMV2_SIMPLE_SWITCH_GRPC_SEARCH_PATHS=${bmv2}/bin"
-      "-DBMV2_PNA_NIC_SEARCH_PATHS=${bmv2}/bin"
-    ];
+    ] ++ lib.optionals doCheck (
+      [
+        "-DFETCHCONTENT_SOURCE_DIR_GTEST=${googletest}"
+      ] ++ lib.optionals enableBMV2 [
+        ### Override search paths for components of bmv2, used for BMV2
+        ### tests. FindBMV2.cmake initializes these paths to relative
+        ### paths that point to pre-built binaries outside the p4c
+        ### source directory. These overrides turn that into proper
+        ### build dependencies but for it to work the variables have to
+        ### be marked as cacheable, see patches above.
+        "-DBMV2_SIMPLE_SWITCH_SEARCH_PATHS=${bmv2}/bin"
+        "-DBMV2_PSA_SWITCH_SEARCH_PATHS=${bmv2}/bin"
+        "-DBMV2_SIMPLE_SWITCH_GRPC_SEARCH_PATHS=${bmv2}/bin"
+        "-DBMV2_PNA_NIC_SEARCH_PATHS=${bmv2}/bin"
+      ] ++ lib.optionals enableTofino [
+        "-DBF_SWITCHD_SEARCH_PATHS=${bf-sde.pkgs.bf-drivers}/bin"
+        "-DHARLYN_MODEL_SEARCH_PATHS=${bf-sde.pkgs.tofino-model}/bin"
+      ]
+    );
 
     enableParallelBuilding = true;
     inherit doCheck;
@@ -255,16 +273,22 @@ let
         ln -s ${spdlog} backends/tofino/third_party/spdlog
       '' +
 
-      ### Create symlinks to the libbpf package in the place expected
-      ### by the test environment. Disable the check for the libc
-      ### version to enable the ebpf kernel test (that check does not
-      ### work in the VM and we know that our libc is ok).
+      ### Create symlinks to the libbpf and bpftool packages in places
+      ### expected by the test environment. Disable the check for the
+      ### libc version to enable the ebpf kernel checks (that check
+      ### does not work in the VM and we know that our libc is ok).
       lib.optionalString (doCheck && enableBPF)
       ''
-        mkdir -p backends/ebpf/runtime/usr/lib64
-        ln -s ${libbpf}/lib/libbpf.a backends/ebpf/runtime/usr/lib64
-
         sed -i -e 's/check_minimum_linux_libc_version.*$/set (SUPPORTS_LIBC TRUE)/' backends/ebpf/CMakeLists.txt
+
+        mkdir -p backends/ebpf/runtime/install/libbpf
+        ln -s ${libbpf}/lib/libbpf.a backends/ebpf/runtime/install/libbpf/
+        ln -s ${libbpf}/include backends/ebpf/runtime/install/libbpf/
+
+        mkdir -p backends/ebpf/runtime/contrib/bpftool/include/uapi
+        ln -s ${libbpf}/include/linux backends/ebpf/runtime/contrib/bpftool/include/uapi/linux
+
+        ln -s ${bpftools}/bin/bpftool backends/ebpf/runtime/install/
       '';
 
     ### The lint checks are not provisioned as regular CMake tests.

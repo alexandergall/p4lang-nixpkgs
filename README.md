@@ -193,16 +193,7 @@ The following test suites are currently **not** supported
 
 Some of the tests in the `bmv2-ptf` and `bmv2-stf` groups fail
 probabilistically when run in parallel. This can be avoided by
-reducing the number of cores as explained above. A small number of
-tests currently fail consistently:
-
-   * testgen-p4c-bmv2-ptf/action_profile-bmv2.p4
-   * testgen-p4c-bmv2-ptf/action_profile_max_group_size_annotation.p4
-   * testgen-p4c-bmv2-ptf/action_profile_sum_of_members_annotation.p4
-   * testgen-p4c-bmv2-ptf/action_selector_shared-bmv2.p4
-   * testgen-p4c-bmv2-ptf/issue297-bmv2.p4
-   * ubpf/testdata/p4_16_samples/ipv4-actions_ubpf.p4
-   * gtestasm
+reducing the number of cores as explained above.
 
 The lint checks are not set up as CMake test cases like the other
 tests. Instead, they are executed explicitely after the configuration
