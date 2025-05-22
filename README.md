@@ -121,6 +121,15 @@ in `default.nix`. This set can contain any of the following attributes
      * Default: `false`
      * Purpose: In addition to building the package, also run the test
        suites, executes in a VM
+   * `delayedChecks`
+     * Type: boolean
+     * Default: `false`
+     * Purpose: [run the checks in a separate derivation](#delayedChecks)
+   * `checkTargets`
+     * Type: list of strings
+     * Default: `[ "check" ]`
+     * Purpose: list of CMake check targets to run if `delayedChecks`
+       is `true`, ignored otherwise
    * `memSize`
       * Type: `integer`
       * Default: 20480
@@ -138,7 +147,7 @@ The attribute set is passed to the build using `--arg p4cOverrides`, e.g.
 nix-build -j auto -A p4c --arg p4cOverrides '{ enableTofino = false; enableBMV2 = false; }'
 ```
 
-## Excercising the test suites
+## Exercising the test suites
 
 The packaging supports a subset of the test cases provided by the p4c
 repository but they are not run by default because some of them
@@ -200,3 +209,85 @@ tests. Instead, they are executed explicitely after the configuration
 stage when the `lintChecks` option is set. The build will fail when
 any of the lint checks fails. Currently, this is the case for the
 `clang` lint check.
+
+## <a name="delayedChecks"></a>Exercising tests in isolation: delayed checking
+
+By default, the tests are executed as part of the build as described
+in the previous section. One consequence of this method is that the
+entire build fails if any one of the tests fails. Another is that
+tests can't be re-run without running the entire build as well, which
+is very time-consuming.
+
+For these reasons and possibly also to facilitate CI pipelines, the
+`p4c` package also supports running all tests in separation of the
+build by enabling the `delayedChecks` property in addition to
+`doCheck`. In that case, the behaviour is changed as follows.
+
+The checks are enabled during the configuration phase according to
+`doCheck`, but the checks themselves are not executed. Instead, the
+`p4c` derivation (a.k.a. "packagae") produces an additional artifact
+("output" in Nix-speak) beside the standard output that contains the
+`p4c` compiler. This additional output contains a copy of the source
+and build tree as it exists at the end of the build. This output is
+then used as the input to a new derivation whose purpose is to perform
+the CMake-based checks, hence the designation "delayed checks".
+
+One can pass a list of cheks to perform as input to this process. This
+list must be a subset of [checks that were registered with
+CMake](/p4c/run-checks.nix). The default is the `check` target, which
+runs all checks.
+
+The delayed-check derivation essentially executes
+
+```
+make <list-of-check-targtes>
+```
+
+It produces an output that contains the following files
+
+   * `checks`: the list of checks that were executed
+   * `log`: the output of the `make` command (stdout and stderr)
+   * `rc`: the return code of `make`. A value of 0 indicates that all
+     checks have passed successfully
+
+For example
+
+```
+$ nix-build --no-out-link -A p4c --arg p4cOverrides '{ doCheck = true; delayedChecks = true; checkTargets = [ "check-bmv2-parser-inline-opt-disabled" ]; }'
+[ suppressed output ]
+/nix/store/ls7jcpigyf8xp37jdl0v61n1igjas7rg-p4c-checks
+$ tail -15 /nix/store/ls7jcpigyf8xp37jdl0v61n1igjas7rg-p4c-checks/log 
+11/13 Test #559: bmv2-parser-inline-opt-disabled/testdata/p4_16_samples/parser-inline/parser-inline-test6.p4 ....   Passed    3.40 sec
+12/13 Test #558: bmv2-parser-inline-opt-disabled/testdata/p4_16_samples/parser-inline/parser-inline-test5.p4 ....   Passed    3.40 sec
+13/13 Test #554: bmv2-parser-inline-opt-disabled/testdata/p4_16_samples/parser-inline/parser-inline-test13.p4 ...   Passed    3.43 sec
+
+100% tests passed, 0 tests failed out of 13
+
+Label Time Summary:
+bmv2-parser-inline-opt-disabled    =  44.09 sec*proc (13 tests)
+
+Total Test time (real) =   3.63 sec
+make[3]: Leaving directory '/build/source/build'
+Built target check-bmv2-parser-inline-opt-disabled
+make[2]: Leaving directory '/build/source/build'
+/nix/store/yxf0cmyfrar671zqh0ml8pcw15mxk0mh-cmake-3.30.5/bin/cmake -E cmake_progress_start /build/source/build/CMakeFiles 0
+make[1]: Leaving directory '/build/source/build'
+$ cat /nix/store/ls7jcpigyf8xp37jdl0v61n1igjas7rg-p4c-checks/rc
+0
+```
+
+Re-running the same command will not re-run the check, because the
+output (`/nix/store/ls7jcpigyf8xp37jdl0v61n1igjas7rg-p4c-checks` in
+this case) already exists (after all, it's just a package and it was
+already built successfully). To force a re-run, first delete the
+output from the nix store
+
+```
+$ nix-store --delete /nix/store/ls7jcpigyf8xp37jdl0v61n1igjas7rg-p4c-checks
+```
+
+Note that we used `--no-out-link` with `nix-build` in this example to
+avoid the creation of the symlink `result` in the current directory
+pointing to the store path. Such a symlink represents a
+garbage-collector root for the store path, i.e. `nix-store --delete`
+would fail unless the symlink is deleted first.

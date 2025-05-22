@@ -26,8 +26,14 @@
 
   ## Some checks can only be run inside a VM, turn off by
   ## default. memSize is the memory assigned to the VM, change to
-  ## match your setup
+  ## match your setup. If delayedChecks is true, the checks are
+  ## configured but not executed. Instead, the entire build tree is
+  ## exported as additional output "build" and the checks listed in
+  ## checkTargets are executed in a separate derivation. checkTargets
+  ## is ignored if delayedChecks is false.
 , doCheck ? false
+, delayedChecks ? false
+, checkTargets ? [ "check" ]
 , memSize ? 20*1024
 
   ## Run the lint checks before building p4c. The Build will fail if
@@ -63,6 +69,7 @@
 }:
 
 assert lintChecks -> ! doCheck;
+assert delayedChecks -> doCheck;
 let
   toCMakeBoolean = v: if v then "ON" else "OFF";
   googletest = fetchFromGitHub {
@@ -86,8 +93,8 @@ let
     rev = "v1.8.3";
     sha256 = "1qcabdc3yrm30vapn7g7lf3bwjissl15y66mpmx2w0gjjc6aqdd1";
   };
-  p4c = stdenv.mkDerivation rec {
-    name = "p4c";
+  p4c = stdenv.mkDerivation (rec {
+    pname = "p4c";
     version = "1.2.5.6";
     src = fetchFromGitHub {
       repo = "p4c";
@@ -138,6 +145,7 @@ let
       ## For the lint checks
       black isort
     ];
+    outputs = [ "out" ] ++ lib.optional delayedChecks "build";
 
     cmakeFlags = [
       "-DENABLE_TOFINO=${toCMakeBoolean enableTofino}"
@@ -291,13 +299,28 @@ let
     lib.optionalString enableTofino
     ''
       ln -sr $out/bin/p4c $out/bin/bf-p4c
+    '' +
+
+    ## Create the "build" output containing the complete source +
+    ## build trees to run the checks in a separate derivation
+    lib.optionalString delayedChecks
+    ''
+      mkdir $build
+      tar -C ../.. -cf - source | tar -C $build -xf -
     '';
-  };
+  } //
+  ## Skip the actual checks when producing the "build" output
+  lib.optionalAttrs delayedChecks {
+    checkPhase = "true";
+  });
 in
-if doCheck then
+if (doCheck && ! delayedChecks) then
   vmTools.runInLinuxVM
     (p4c.overrideAttrs {
       inherit memSize;
     })
 else
-  p4c
+  if delayedChecks then
+    import ./run-checks.nix {inherit lib stdenv vmTools p4c memSize checkTargets; }
+  else
+    p4c
