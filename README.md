@@ -188,8 +188,6 @@ The following test suites are currently **not** supported
 
    * P4TC
    * DPDK
-   * Tofino tests requring `bf_switchd` and `tofino-model` (though no
-     actual tests appear to exist at this time)
 
 Some of the tests in the `bmv2-ptf` and `bmv2-stf` groups fail
 probabilistically when run in parallel. This can be avoided by
@@ -231,14 +229,16 @@ runs all checks.
 The delayed-check derivation essentially executes
 
 ```
-make <list-of-check-targtes>
+for target in $checkTargets; do
+  make $target
+done
 ```
 
 It produces an output that contains the following files
 
    * `checks`: the list of checks that were executed
-   * `log`: the output of the `make` command (stdout and stderr)
-   * `rc`: the return code of `make`. A value of 0 indicates that all
+   * `$target.log`: the output of the `make $target` command (stdout and stderr)
+   * `$target.rc`: the return code of `make $target`. A value of 0 indicates that all
      checks have passed successfully
 
 For example
@@ -247,23 +247,23 @@ For example
 $ nix-build --no-out-link -A p4c --arg p4cOverrides '{ doCheck = true; delayedChecks = true; checkTargets = [ "check-bmv2-parser-inline-opt-disabled" ]; }'
 [ suppressed output ]
 /nix/store/ls7jcpigyf8xp37jdl0v61n1igjas7rg-p4c-checks
-$ tail -15 /nix/store/ls7jcpigyf8xp37jdl0v61n1igjas7rg-p4c-checks/log 
-11/13 Test #559: bmv2-parser-inline-opt-disabled/testdata/p4_16_samples/parser-inline/parser-inline-test6.p4 ....   Passed    3.40 sec
-12/13 Test #558: bmv2-parser-inline-opt-disabled/testdata/p4_16_samples/parser-inline/parser-inline-test5.p4 ....   Passed    3.40 sec
-13/13 Test #554: bmv2-parser-inline-opt-disabled/testdata/p4_16_samples/parser-inline/parser-inline-test13.p4 ...   Passed    3.43 sec
+$ tail -15 /nix/store/8yd0mkflmrlwsklsfzk3p17x6c8s4wvc-p4c-checks/check-bmv2-parser-inline-opt-disabled.log
+11/13 Test #557: bmv2-parser-inline-opt-disabled/testdata/p4_16_samples/parser-inline/parser-inline-test4.p4 ....   Passed    3.30 sec
+12/13 Test #555: bmv2-parser-inline-opt-disabled/testdata/p4_16_samples/parser-inline/parser-inline-test2.p4 ....   Passed    3.31 sec
+13/13 Test #550: bmv2-parser-inline-opt-disabled/testdata/p4_16_samples/parser-inline/parser-inline-test1.p4 ....   Passed    3.33 sec
 
 100% tests passed, 0 tests failed out of 13
 
 Label Time Summary:
-bmv2-parser-inline-opt-disabled    =  44.09 sec*proc (13 tests)
+bmv2-parser-inline-opt-disabled    =  42.85 sec*proc (13 tests)
 
-Total Test time (real) =   3.63 sec
+Total Test time (real) =   3.52 sec
 make[3]: Leaving directory '/build/source/build'
 Built target check-bmv2-parser-inline-opt-disabled
 make[2]: Leaving directory '/build/source/build'
 /nix/store/yxf0cmyfrar671zqh0ml8pcw15mxk0mh-cmake-3.30.5/bin/cmake -E cmake_progress_start /build/source/build/CMakeFiles 0
 make[1]: Leaving directory '/build/source/build'
-$ cat /nix/store/ls7jcpigyf8xp37jdl0v61n1igjas7rg-p4c-checks/rc
+$ cat /nix/store/8yd0mkflmrlwsklsfzk3p17x6c8s4wvc-p4c-checks/check-bmv2-parser-inline-opt-disabled.rc
 0
 ```
 

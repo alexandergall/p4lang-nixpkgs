@@ -93,12 +93,15 @@ vmTools.runInLinuxVM (stdenv.mkDerivation {
       NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -Wno-unused-command-line-argument"
     '' +
 
-    ## Execute the checks, save the output and result
+    ## Execute the checks, save the output and result. Capture of the
+    ## RC of make relies on "set -o pipefail" provided by stdenv.
     ''
       echo $checkTargets >$out/checks
       set +e
-      make VERBOSE=y $checkTargets 2>&1 | tee $out/log
-      echo $? >$out/rc
+      for target in $checkTargets; do
+          make VERBOSE=y $target 2>&1 | tee $out/$target.log
+          echo $? >$out/$target.rc
+      done
       set -e
     '';
 })
