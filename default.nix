@@ -10,23 +10,25 @@ let
   pkgs = import nixpkgs {
     overlays = import ./overlay.nix;
   };
-in pkgs.lib.makeScope pkgs.newScope (self:
-  {
-    p4c = (self.callPackage ./p4c {
-      ## The eBPF tests use tc from iproute2 to load eBPF
-      ## programs. Newer iproute2 versions use a libbpf version >1.0,
-      ## which conflicts with how the p4c eBPF backend currently
-      ## generates ELF binaries. This crude downgrade sidesteps the
-      ## problem.
-      iproute2 = pkgs.iproute2.override {
-        libbpf = pkgs.libbpf_0;
-      };
-    }).override p4cOverrides;
-    bmv2 = self.callPackage ./bmv2 {};
-    PI = self.callPackage ./PI {};
-    p4runtime-py = self.callPackage ./p4runtime-py {};
-    ptf = self.callPackage ./ptf {};
-    target-syslibs = self.callPackage ./target-syslibs {};
-    target-utils = self.callPackage ./target-utils {};
-  }
-)
+  p4lang = pkgs.lib.makeScope pkgs.newScope (self:
+    {
+      p4c = (self.callPackage ./p4c {
+        ## The eBPF tests use tc from iproute2 to load eBPF
+        ## programs. Newer iproute2 versions use a libbpf version >1.0,
+        ## which conflicts with how the p4c eBPF backend currently
+        ## generates ELF binaries. This crude downgrade sidesteps the
+        ## problem.
+        iproute2 = pkgs.iproute2.override {
+          libbpf = pkgs.libbpf_0;
+        };
+      }).override p4cOverrides;
+      bmv2 = self.callPackage ./bmv2 {};
+      PI = self.callPackage ./PI {};
+      p4runtime-py = self.callPackage ./p4runtime-py {};
+      ptf = self.callPackage ./ptf {};
+      target-syslibs = self.callPackage ./target-syslibs {};
+      target-utils = self.callPackage ./target-utils {};
+    }
+  );
+in with pkgs.lib;
+  filterAttrs (n: v: attrsets.isDerivation v) p4lang
