@@ -1,0 +1,17 @@
+{
+    "p4lang-nixpkgs": {
+        "enabled": 1,
+        "hidden": false,
+        "description": "Nix packaging for the P4lang project",
+        "nixexprinput": "src",
+        "nixexprpath": "default.nix",
+        "checkinterval": 300,
+        "schedulingshares": 100,
+        "enableemail": false,
+        "emailoverride": "",
+        "keepnr": 3,
+        "inputs": {
+            "src": { "type": "git", "value": "https://github.com/alexandergall/p4lang-nixpkgs.git", "emailresponsible": false }
+        }
+    }
+}
