@@ -43,6 +43,7 @@
 
   ## Configure options
 , enableTofino ? true
+, enableControlPlane ? true
 , enableBMV2 ? true
 , enableBPF ? true
 , enableDPDK ? true
@@ -103,12 +104,12 @@ let
   }) {}).bf-sde.v9_13_4;
   p4c = stdenv.mkDerivation (rec {
     pname = "p4c";
-    version = "1.2.5.8";
+    version = "1.2.5.9";
     src = fetchFromGitHub {
       repo = "p4c";
       owner = "p4lang";
-      rev = "v${version}";
-      hash = "sha256-bRwWnUa9gaqOB+qVFieXLqMzrAjjlKTtPfIrmY+VUbY=";
+      rev = "93294e3";
+      hash = "sha256-MeFqmEOhYfe2b7P8YPD+SWAC/mrar2jvk1UcJclf7ZY=";
     };
 
     patches = [
@@ -161,29 +162,30 @@ let
     outputs = [ "out" ] ++ lib.optional delayedChecks "build";
 
     cmakeFlags = [
-      "-DENABLE_TOFINO=${toCMakeBoolean enableTofino}"
-      "-DENABLE_BMV2=${toCMakeBoolean enableBMV2}"
-      "-DENABLE_EBPF=${toCMakeBoolean enableBPF}"
-      "-DENABLE_UBPF=${toCMakeBoolean enableBPF}"
-      "-DENABLE_DPDK=${toCMakeBoolean enableDPDK}"
-      "-DENABLE_P4TC=${toCMakeBoolean enableP4TC}"
-      "-DENABLE_P4FMT=${toCMakeBoolean enableP4FMT}"
-      "-DENABLE_P4C_GRAPHS=${toCMakeBoolean enableP4CGraphs}"
+      (lib.cmakeBool "ENABLE_TOFINO" enableTofino)
+      (lib.cmakeBool "ENABLE_CONTROL_PLANE" enableControlPlane)
+      (lib.cmakeBool "ENABLE_BMV2" enableBMV2)
+      (lib.cmakeBool "ENABLE_EBPF" enableBPF)
+      (lib.cmakeBool "ENABLE_UBPF" enableBPF)
+      (lib.cmakeBool "ENABLE_DPDK" enableDPDK)
+      (lib.cmakeBool "ENABLE_P4TC" enableP4TC)
+      (lib.cmakeBool "ENABLE_P4FMT" enableP4FMT)
+      (lib.cmakeBool "ENABLE_P4C_GRAPHS" enableP4CGraphs)
 
       ## For backends/p4tools/CMakeLists.txt, also see comment on
       ## P4C_VERSION below
       "-DP4C_SEM_VERSION_STRING=${version}"
 
       ## Flags derived from doCheck
-      "-DENABLE_GTESTS=${toCMakeBoolean doCheck}"
-      "-DENABLE_P4TEST=${toCMakeBoolean doCheck}"
-      "-DENABLE_TEST_TOOLS=${toCMakeBoolean doCheck}"
+      (lib.cmakeBool "ENABLE_GTESTS" doCheck)
+      (lib.cmakeBool "ENABLE_P4TEST" doCheck)
+      (lib.cmakeBool "ENABLE_TEST_TOOLS" doCheck)
 
       ## Enable pre-installed dependencies
-      "-DP4C_USE_PREINSTALLED_ABSEIL=ON"
-      "-DP4C_USE_PREINSTALLED_BDWGC=ON"
-      "-DUSE_PREINSTALLED_Z3=ON"
-      "-DP4C_USE_PREINSTALLED_PROTOBUF=ON"
+      (lib.cmakeBool "P4C_USE_PREINSTALLED_ABSEIL" true)
+      (lib.cmakeBool "P4C_USE_PREINSTALLED_BDWGC" true)
+      (lib.cmakeBool "USE_PREINSTALLED_Z3" true)
+      (lib.cmakeBool "P4C_USE_PREINSTALLED_PROTOBUF" true)
 
       ## The non-pre-installed branch of p4c_obtain_protobuf in
       ## cmake/Protobuf.cmake has the comment
@@ -246,7 +248,7 @@ let
       ### source doesn't have .git (and using leaveDotGit in
       ### fetchFromGitHub is not deterministic).
       ''
-        export P4C_VERSION=${version}
+        export P4C_VERSION="${version} (SHA: ${src.rev})"
       '' +
 
       ### Protobuf is very picky about version number matches
