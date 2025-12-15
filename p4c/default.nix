@@ -104,12 +104,12 @@ let
   }) {}).bf-sde.v9_13_4;
   p4c = stdenv.mkDerivation (rec {
     pname = "p4c";
-    version = "1.2.5.9";
+    version = "1.2.5.10";
     src = fetchFromGitHub {
       repo = "p4c";
       owner = "p4lang";
-      rev = "93294e3";
-      hash = "sha256-MeFqmEOhYfe2b7P8YPD+SWAC/mrar2jvk1UcJclf7ZY=";
+      rev = "8c4420";
+      hash = "sha256-qrYmC0JtePkk0o2hgzYBY6RRhxESnCewmICGn2boo24=";
     };
 
     patches = [
