@@ -5,13 +5,12 @@
 
 python3.pkgs.buildPythonPackage rec {
   pname = "p4runtime-py";
-  ## v1.4.1-18-g5e6138d
-  version = "v1.4.1-18";
+  version = "v1.5.0";
   src = fetchFromGitHub {
     repo = "p4runtime";
     owner = "p4lang";
-    rev = "5e6138d";
-    hash = "sha256-Hgi1G2Bld01/tx+YMasY1oRhPkPrne2yS/N8szgZWhY=";
+    rev = "${version}";
+    hash = "sha256-bGR19GCEXjMT2YTpAWwPZAij3y/RxVXVzYgItsYJla0=";
   };
   pyproject = true;
   nativeBuildInputs = with python3.pkgs; [ setuptools-scm ];

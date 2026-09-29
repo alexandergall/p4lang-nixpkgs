@@ -4,14 +4,13 @@
 
 python3.pkgs.buildPythonApplication rec {
   pname = "ptf";
-  ## Setuptools doesn't accept Git commits as valid version number
-  version = "0.9.4-17";
+  version = "0.11.0";
   
   src = fetchFromGitHub {
     repo = "ptf";
     owner = "p4lang";
-    rev = "77a5ba4";
-    hash = "sha256-H15c4MiTO/zzpHDMFoQqVMA8pZe+9TAwuSMQiEepGaQ=";
+    rev = "v${version}";
+    hash = "sha256-MBGZd6tnxnWyWLrqnQD89nrpPMWLJZy6vNSf8/4G2Sw=";
   };
 
   format = "setuptools";

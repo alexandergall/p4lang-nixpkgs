@@ -18,8 +18,17 @@ let
       python3 = prev.python3.override {
         packageOverrides = python-self: python-super: (
           {
+            ## Global overrides
             protobuf = python-self.protobuf4;
-          } // import ./p4c/python-overrides.nix final prev python-self python-super
+          } //
+          ## Per-component overrides, stored separately to make the
+          ## dependence manifest.
+          builtins.foldl' (result: next:
+            result // (import next final prev python-self python-super)) {}
+            [
+              ./p4c/python-overrides.nix
+              ./bmv2/python-overrides.nix
+            ]
         );
       };
     };

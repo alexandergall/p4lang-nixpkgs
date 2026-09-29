@@ -8,14 +8,14 @@
 , boost
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation (finalArgs: {
   pname = "PI";
-  version = "v0.1.0-25-g17802cf";
+  version = "v0.1.4";
   src = fetchFromGitHub {
     repo = "PI";
     owner = "p4lang";
-    rev = "17802cf";
-    hash = "sha256-uSKkowR27BJ3HuzgkpMii2DV6IRwdur5qkGV4NnoXzk=";
+    rev = "${finalArgs.version}";
+    hash = "sha256-5WxrhsvcZwA5cgTTQ2uc7/l1/33HY1dNa9O28Tzkptk=";
     fetchSubmodules = true;
   };
   nativeBuildInputs = [ autoreconfHook pkg-config ];
@@ -27,7 +27,4 @@ stdenv.mkDerivation rec {
     ## The detection code in proto/m4/ax_boost_system.m4 doesn't work properly
     "--with-boost-libdir=${boost}/lib"
   ];
-  passthru = {
-    inherit src;
-  };
-}
+})

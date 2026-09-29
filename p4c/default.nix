@@ -104,12 +104,12 @@ let
   }) {}).bf-sde.v9_13_4;
   p4c = stdenv.mkDerivation (rec {
     pname = "p4c";
-    version = "1.2.5.12";
+    version = "1.2.5.17";
     src = fetchFromGitHub {
       repo = "p4c";
       owner = "p4lang";
-      rev = "cc43e9";
-      hash = "sha256-5SbWA8ykP+r1XhO8MrR69l9ENMuuym5ILxa3dYh/Z9U=";
+      rev = "d46d8242";
+      hash = "sha256-7jw8cky9EQT6uEwUebxA4DvBWCDJprXRKjBPOfIRHEo=";
     };
 
     patches = [
@@ -128,7 +128,7 @@ let
 
         (python3.withPackages (pkgs:
           with pkgs; [ jsl jsonschema pyyaml ] ++
-                     lib.optionals doCheck [ scapy ply nnpy p4runtime-py ]))
+                     lib.optionals doCheck [ scapy ply nnpy pynng p4runtime-py ]))
 
         ## find_package() for Protobuf complains about not finding zlib,
         ## but we probably don't really need this
@@ -171,10 +171,6 @@ let
       (lib.cmakeBool "ENABLE_P4TC" enableP4TC)
       (lib.cmakeBool "ENABLE_P4FMT" enableP4FMT)
       (lib.cmakeBool "ENABLE_P4C_GRAPHS" enableP4CGraphs)
-
-      ## For backends/p4tools/CMakeLists.txt, also see comment on
-      ## P4C_VERSION below
-      "-DP4C_SEM_VERSION_STRING=${version}"
 
       ## Flags derived from doCheck
       (lib.cmakeBool "ENABLE_GTESTS" doCheck)
@@ -243,12 +239,17 @@ let
         patchShebangs backends tools
       '' +
 
-      ### Set the version explicitly, otherwise CMake will atempt to use
-      ### git to determine the commit hash, which fails because our
-      ### source doesn't have .git (and using leaveDotGit in
-      ### fetchFromGitHub is not deterministic).
+      ### Set the version explicitly, otherwise CMake will atempt to
+      ### use git to determine the commit hash, which fails because
+      ### our source doesn't have .git (and using leaveDotGit in
+      ### fetchFromGitHub is not deterministic). Note: up to 1.2.5.16,
+      ### P4C_SEM_VERSION_STRING could be set independently from
+      ### P4C_VERSION, so we could have the latter include the Git
+      ### rev. Starting with 1.2.5.16, P4C_SEM_VERSION_STRING is
+      ### forced to be identical to P4C_VERSION and thus must meet the
+      ### standard for Cmake project version numbers.
       ''
-        export P4C_VERSION="${version} (SHA: ${src.rev})"
+        export P4C_VERSION="${version}"
       '' +
 
       ### Protobuf is very picky about version number matches
